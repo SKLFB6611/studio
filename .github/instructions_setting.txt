@@ -1,0 +1,6 @@
+備忘：
+路徑：.github/instructions/xxx.instructions.md
+頂部必須加 applyTo: "**"
+settings.json 要開啟 useInstructionFiles
+
+之後新增其他 skill 的 instructions 照同樣格式放就行。
