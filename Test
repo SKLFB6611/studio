@@ -1,0 +1,93 @@
+結論先行：Hermes 唯讀設定盤點完成，未修改、未刪除、未重啟
+
+以下數字均為本機實測【查證】；預設值以 config.yaml 內註解標示為準，註解未標示者 mark 為「未查證」。
+
+一頁總覽
+
+- 實際根目錄：HERMES_HOME=/opt/data【查證】，HOME=/opt/data/home
+  - hermes config path = /opt/data/config.yaml
+  - hermes config env-path = /opt/data/.env
+  - ~/.hermes、~/.hermes/、 /opt/data/profiles 均未找到
+  - 工具 hermes 在 /opt/hermes/bin/hermes，版本 v0.23.3，Docker 安裝，Install dir /opt/hermes
+- 目前啟用 profile：default 唯一一個【查證】(hermes profile list)
+- 預設 model / provider：meta/muse-ember / openrouter（model 區 78-117 行）
+  - hermes status --full 顯示 Provider custom，與 config show 的 openrouter 不一致 → 列入待確認
+- 運行中的服務：gateway running，PID 177，s6 supervisor 管理，非 systemd
+  - telegram = connected，最後更新 2026-11-22T21:41:33Z
+  - api_server = connected，http://127.0.0.1:8642
+- 排程數量：0 個 job【查證】
+- MCP 數量：0 個 server【查證】
+- 總大小：/opt/data 約 22M【查證】；config.yaml 134902 bytes / 2507 行；state.db 1.5M + WAL 2.4M
+
+---
+
+1. 設定檔位置
+
+config.yaml
+• 目前值: /opt/data/config.yaml，134902 bytes，2026-11-21 03:58，0640
+• 來源: hermes config path；stat；第 10 行 _config_version: 54
+• 與預設是否不同: seeded default 範本，已填 "meta/muse-ember" 等參數 → 不同（模型已個人化）
+
+.env
+• 目前值: /opt/data/.env，27614 bytes，2026-11-21 04:32，0600
+• 來源: hermes config env-path
+• 與預設是否不同: 含密文，優先級高於 config.yaml 對應設定（第 4-5 行註解）
+
+auth.json
+• 目前值: /opt/data/auth.json，686 bytes，0600
+• 來源: hermes status；stat
+• 與預設是否不同: 含 providers、credential_pool，內容遮蔽不輸出
+
+Profile 設定
+• 目前值: 未找到獨立 profile 目錄
+• 來源: ls /opt/data/profiles 無此目錄
+• 與預設是否不同: 僅 default 用主 config.yaml
+
+SOUL.md
+• 目前值: /opt/data/SOUL.md，668 bytes，0644，2026-11-21 03:42
+• 來源: find；doctor 顯示 exists
+• 與預設是否不同: 預設 persona 文字「You are Hermes Agent...」
+
+載入優先順序
+• 目前值: .env 密文 > config.yaml 對應鍵 > 預設值；HERMES_HOME 決定實際路徑
+• 來源: 第 4-5 行註解；HERMES_HOME=/opt/data
+• 與預設是否不同: —
+
+2. 主 agent 設定
+
+- model.default = "meta/muse-ember" — 第 81 行 — 與預設模型不同（已改為此模型）
+- provider = "openrouter" — 第 113 行；base_url = "https://openrouter.ai/api/v1" — 第 117 行
+- api_mode = chat_completions【查證】(hermes config get)
+- agent.max_turns = 150 — 第 1242 行 — 註解預設為 500 → 不同
+  - 同時環境變數 HERMES_MAX_ITERATIONS=150【查證】
+- personality：display.personality = 空值；agent.personalities = {} — 第 1418 行
+  - 實際 persona = 預設 SOUL.md → 與自訂人格相同（未更換）
+- system_prompt：agent.system_prompt = 未設定【查證】
+- toolsets：
+  - platform_toolsets 第 1538-1540 行：cli: [hermes-cli]、telegram: [hermes-telegram]、discord: [hermes-discord] 等
+  - hermes tools list (cli 檢查)：enabled 包含 web、browser、terminal、file、code_execution、vision、image_gen、tts、skills、todo、memory、session_search、connections、clarify、delegation、cronjob、computer_use
+  - disabled：video、video_gen、x_search、stt、kanban、context_engine
+- runtime 第 47-49 行：nofile_soft_limit: 4096、malloc_arena_max: 4 → 與註解預設相同
+- database.journal_mode = "wal" — 第 21 行；doctor 確認 state.db WAL 模式 → 與預設相同
+- gateway：unmanaged_idle_exit_seconds: 600、platform_connect_timeout: 30、loop_watchdog: true、allow_all_users: false — 第 1428-1439 行
+- timezone：hermes config show 顯示 (server-local)；hermes config get timezone 無值 → 未設定明確時區，但環境時區為 UTC
+
+3. Profiles 清單
+
+- 數量：1 個【查證】
+  - 名稱：default（hermes profile list 標 ◆default）
+  - 路徑：無獨立目錄，沿用 /opt/data/config.yaml、/opt/data/.env、/opt/data/memories/、/opt/data/skills/
+  - Model：meta/muse-ember
+  - Gateway：running，PID 177
+  - 與主設定差異：無差異（即主體）
+- 目前啟用：default
+- 未找到其他 profile：已檢查 ls /opt/data/profiles、此路徑不存在
+
+4. Models 清單
+
+- 預設 model：meta/muse-ember（config.yaml 78 行）
+- Provider：openrouter；base_url：https://openrouter.ai/api/v1
+- 別名：未設定
+- 備援 (fallback)：未設定【查證】(hermes fallback list 顯示 No fallback providers configured)
+- 已設定密文：
+  - OPENROUTER_API_KEY = 已設定 sk-o...43bf len 73【查證】 (1/3)
